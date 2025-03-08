@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1>Заказ #{{ order.id }}</h1>
+    </div>
+    <div class="card-body">
+        <p><strong>Стол:</strong> {{ order.table_number }}</p>
+        <p><strong>Статус:</strong> {{ order.get_status_display }}</p>
+        <p><strong>Общая стоимость:</strong> {{ order.total_price }} ₽</p>
+
+        <h2>Блюда:</h2>
+        <ul>
+            {% for item in order.items %}
+            <li>
+                {{ item.name }} - {{ item.price }} ₽ x {{ item.quantity }}
+            </li>
+            {% empty %}
+            <li>Нет блюд в заказе.</li>
+            {% endfor %}
+        </ul>
+
+        <a href="{% url 'order_update' order.pk %}" class="btn btn-primary">Редактировать</a>
+        <a href="{% url 'order_delete' order.pk %}" class="btn btn-danger">Удалить</a>
+        <a href="{% url 'order_list' %}" class="btn btn-secondary">Назад к списку заказов</a>
+    </div>
+</div>
+{% endblock %}

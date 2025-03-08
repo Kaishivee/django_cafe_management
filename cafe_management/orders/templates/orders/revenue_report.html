@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1>Отчет о выручке</h1>
+    </div>
+    <div class="card-body">
+        <p>Общая выручка: {{ total_revenue }} ₽</p>
+
+        <h2>Статистика по проданным блюдам</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Блюдо</th>
+                    <th>Количество</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dish, quantity in sold_items %}
+                <tr>
+                    <td>{{ dish }}</td>
+                    <td>{{ quantity }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="2">Нет данных о проданных блюдах.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <a href="{% url 'order_list' %}" class="btn btn-secondary">Назад к списку заказов</a>
+    </div>
+</div>
+{% endblock %}
