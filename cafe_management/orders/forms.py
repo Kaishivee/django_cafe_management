@@ -1,8 +1,7 @@
-# orders/forms.py
 from django import forms
 from django.core.validators import MinValueValidator
+
 from .models import Order
-from .menu import MENU
 
 class OrderForm(forms.ModelForm):
     class Meta:
@@ -22,8 +21,7 @@ class OrderForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['items'].required = False  # Поле items не обязательно для заполнения вручную
-        # Добавляем валидатор для table_number
-        self.fields['table_number'].validators.append(MinValueValidator(1))
+        self.fields['table_number'].validators.append(MinValueValidator(1)) # Валидатор для table_number
 
     def clean_table_number(self):
         """

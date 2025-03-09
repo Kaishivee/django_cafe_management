@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Sum
+
 from .models import Order
 from .forms import OrderForm
 from .menu import MENU
@@ -24,8 +25,8 @@ def order_create(request):
         selected_dishes = request.POST.getlist('dishes')
         items = []
         for dish in selected_dishes:
-            quantity = request.POST.get(f'quantity_{dish}', 1)  # Получаем количество
-            quantity = int(quantity) if quantity else 1  # По умолчанию количество 1
+            quantity = request.POST.get(f'quantity_{dish}', 1)
+            quantity = int(quantity) if quantity else 1
             # Ищем цену блюда в MENU
             for category, dishes in MENU.items():
                 if dish in dishes:
@@ -37,8 +38,8 @@ def order_create(request):
 
         # Обновляем данные формы перед валидацией
         if items:
-            form.data = form.data.copy()  # Делаем копию данных формы
-            form.data['items'] = items  # Добавляем список блюд в данные формы
+            form.data = form.data.copy()
+            form.data['items'] = items
 
         if form.is_valid():
             # Сохраняем список блюд в поле items
