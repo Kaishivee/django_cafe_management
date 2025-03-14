@@ -1,15 +1,19 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Sum
+from rest_framework.exceptions import ValidationError
+
+from .services.order_service import OrderService
 
 from .models import Order
 from .forms import OrderForm
-from .menu import MENU
+from orders.menu import MENU
 
 
 def order_list(request):
-    """Показываем только заказы в ожидании"""
-    orders = Order.objects.filter(status='waiting')
-    return render(request, 'orders/order_list.html', {'orders': orders, 'menu': MENU})
+    status_filter = request.GET.get('status')
+    table_number_filter = request.GET.get('table_number')
+    orders = OrderService.filter_orders(status=status_filter, table_number=table_number_filter)
+    return render(request, 'orders/order_list.html', {'orders': orders})
 
 
 def order_detail(request, pk):
@@ -18,76 +22,85 @@ def order_detail(request, pk):
 
 
 def order_create(request):
-    if request.method == "POST":
-        form = OrderForm(request.POST)
+    try:
+        if request.method == "POST":
+            form = OrderForm(request.POST)
+            # Получаем выбранные блюда и их количество
+            selected_dishes = request.POST.getlist('dishes')
+            items = []
+            for dish in selected_dishes:
+                quantity = request.POST.get(f'quantity_{dish}', 1)
+                quantity = int(quantity) if quantity else 1
+                # Ищем цену блюда в MENU
+                for category, dishes in MENU.items():
+                    if dish in dishes:
+                        items.append({
+                            'name': dish,
+                            'price': dishes[dish],
+                            'quantity': quantity,
+                        })
+            # Обновляем данные формы перед валидацией
+            if items:
+                form.data = form.data.copy()
+                form.data['items'] = items
 
-        # Получаем выбранные блюда и их количество
-        selected_dishes = request.POST.getlist('dishes')
-        items = []
-        for dish in selected_dishes:
-            quantity = request.POST.get(f'quantity_{dish}', 1)
-            quantity = int(quantity) if quantity else 1
-            # Ищем цену блюда в MENU
-            for category, dishes in MENU.items():
-                if dish in dishes:
-                    items.append({
-                        'name': dish,
-                        'price': dishes[dish],
-                        'quantity': quantity,
-                    })
-
-        # Обновляем данные формы перед валидацией
-        if items:
-            form.data = form.data.copy()
-            form.data['items'] = items
-
-        if form.is_valid():
             # Сохраняем список блюд в поле items
-            order = form.save(commit=False)
-            order.items = items
-            order.save()
-            return redirect('order_detail', pk=order.pk)
-    else:
-        form = OrderForm()
+            if form.is_valid():
+                order = form.save(commit=False)
+                order.items = items
+                order.save()
+                return redirect('order_detail', pk=order.pk)
+            else:
+                raise ValidationError("Некорректные данные в форме.")
+        else:
+            form = OrderForm()
 
-    return render(request, 'orders/order_form.html', {'form': form, 'menu': MENU})
+        return render(request, 'orders/order_form.html', {'form': form, 'menu': MENU})
+    except ValidationError as e:
+        return render(request, 'orders/order_form.html', {'form': form, 'menu': MENU, 'error': str(e)})
 
 
 def order_update(request, pk):
-    order = get_object_or_404(Order, pk=pk)
-    if request.method == "POST":
-        form = OrderForm(request.POST, instance=order)
+    try:
+        order = get_object_or_404(Order, pk=pk)
+        if request.method == "POST":
+            form = OrderForm(request.POST, instance=order)
 
-        # Получаем выбранные блюда и их количество
-        selected_dishes = request.POST.getlist('dishes')
-        items = []
-        for dish in selected_dishes:
-            quantity = request.POST.get(f'quantity_{dish}', 1)  # Получаем количество
-            quantity = int(quantity) if quantity else 1  # По умолчанию количество 1
-            # Ищем цену блюда в MENU
-            for category, dishes in MENU.items():
-                if dish in dishes:
-                    items.append({
-                        'name': dish,
-                        'price': dishes[dish],
-                        'quantity': quantity,
-                    })
+            # Получаем выбранные блюда и их количество
+            selected_dishes = request.POST.getlist('dishes')
+            items = []
+            for dish in selected_dishes:
+                quantity = int(request.POST.get(f'quantity_{dish}', 1) or 1)  # Получаем количество
+                quantity = int(quantity) if quantity else 1  # По умолчанию количество 1
+                # Ищем цену блюда в MENU
+                for category, dishes in MENU.items():
+                    if dish in dishes:
+                        items.append({
+                            'name': dish,
+                            'price': dishes[dish],
+                            'quantity': quantity,
+                        })
 
-        # Обновляем данные формы перед валидацией
-        if items:
-            form.data = form.data.copy()  # Делаем копию данных формы
-            form.data['items'] = items  # Добавляем список блюд в данные формы
+            # Обновляем данные формы перед валидацией
+            if items:
+                form.data = form.data.copy()  # Делаем копию данных формы
+                form.data['items'] = items  # Добавляем список блюд в данные формы
 
-        if form.is_valid():
-            # Сохраняем список блюд в поле items
-            order = form.save(commit=False)
-            order.items = items
-            order.save()
-            return redirect('order_detail', pk=order.pk)
-    else:
-        form = OrderForm(instance=order)
+            if form.is_valid():
+                # Сохраняем список блюд в поле items
+                order = form.save(commit=False)
+                order.items = items
+                order.calculate_total_price()
+                order.save()
+                return redirect('order_detail', pk=order.pk)
+            else:
+                raise ValidationError("Некорректные данные в форме.")
+        else:
+            form = OrderForm(instance=order)
 
-    return render(request, 'orders/order_form.html', {'form': form, 'menu': MENU})
+        return render(request, 'orders/order_form.html', {'form': form, 'menu': MENU})
+    except ValidationError as e:
+        return render(request, 'orders/order_form.html', {'form': form, 'menu': MENU, 'error': str(e)})
 
 
 def order_delete(request, pk):
@@ -97,12 +110,17 @@ def order_delete(request, pk):
 
 
 def order_update_status(request, pk):
-    order = get_object_or_404(Order, pk=pk)
-    if request.method == "POST":
-        new_status = request.POST.get('status')
-        order.status = new_status
-        order.save()
-    return redirect(request.META.get('HTTP_REFERER', 'order_list'))
+    try:
+        order = get_object_or_404(Order, pk=pk)
+        if request.method == "POST":
+            new_status = request.POST.get('status')
+            if new_status not in dict(Order.STATUS_CHOICES).keys():
+                raise ValidationError("Некорректный статус заказа.")
+            order.status = new_status
+            order.save()
+        return redirect(request.META.get('HTTP_REFERER', 'order_list'))
+    except ValidationError as e:
+        return render(request, 'orders/error.html', {'error': str(e)})
 
 
 def ready_orders(request):

@@ -2,8 +2,6 @@ from django.db import models
 from django.core.validators import MinValueValidator
 from django.db.models import JSONField
 
-from .menu import MENU
-
 
 class Order(models.Model):
     STATUS_CHOICES = [
@@ -24,13 +22,14 @@ class Order(models.Model):
         """
         Вычисляет общую стоимость заказа на основе списка блюд.
         """
-        total = 0
-        for item in self.items:
-            dish_name = item['name']
-            quantity = item['quantity']
-            for category, dishes in MENU.items():
-                if dish_name in dishes:
-                    total += dishes[dish_name] * quantity
+        if not isinstance(self.items, list):
+            self.items = []  # Сбрасываем в пустой список, если данные некорректны
+
+        total = sum(
+            item.get('price', 0) * item.get('quantity', 1)
+            for item in self.items
+            if isinstance(item, dict) and 'price' in item and 'quantity' in item
+        )
         self.total_price = total
 
     def save(self, *args, **kwargs):
